@@ -24,7 +24,7 @@
 #
 # Copyright (c) 2005-2009 Greg Hewgill
 
-import codecs, md5, os, pickle, pprint, re, shutil, sys, urllib2, xml.dom.minidom, xmlrpclib
+import codecs, os, pickle, pprint, re, shutil, sys, urllib2, xml.dom.minidom, xmlrpclib
 from xml.sax import saxutils
 
 MimeExtensions = {
@@ -33,8 +33,14 @@ MimeExtensions = {
     "image/png": ".png",
 }
 
+try:
+    from hashlib import md5
+except ImportError:
+    import md5 as _md5
+    md5 = _md5.new
+
 def calcchallenge(challenge, password):
-    return md5.new(challenge+md5.new(password).hexdigest()).hexdigest()
+    return md5(challenge+md5(password).hexdigest()).hexdigest()
 
 def flatresponse(response):
     r = {}
@@ -157,7 +163,8 @@ def ljdump(Server, Username, Password, Journal):
         'getpickwurls': 1,
     }, Password))
     userpics = dict(zip(map(str, r['pickws']), r['pickwurls']))
-    userpics['*'] = r['defaultpicurl']
+    if r['defaultpicurl']:
+        userpics['*'] = r['defaultpicurl']
 
     while True:
         r = server.LJ.XMLRPC.syncitems(dochallenge(server, {
@@ -241,7 +248,10 @@ def ljdump(Server, Username, Password, Journal):
                 print "*** Error fetching comment meta, possibly not community maintainer?"
                 break
         finally:
-            r.close()
+            try:
+                r.close()
+            except AttributeError: # r is sometimes a dict for unknown reasons
+                pass
         for c in meta.getElementsByTagName("comment"):
             id = int(c.getAttribute("id"))
             metacache[id] = {
@@ -376,3 +386,4 @@ if __name__ == "__main__":
             ljdump(server, username, password, journal)
         else:
             ljdump(server, username, password, username)
+# vim:ts=4 et:	
